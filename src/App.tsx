@@ -6,6 +6,7 @@ type NotificationStatus = 'unsupported' | 'default' | 'granted' | 'denied';
 type Period = {
   id: PeriodId;
   label: string;
+  emoji: string;
   time: string;
   hour: number;
   minute: number;
@@ -21,12 +22,24 @@ type MoodRecord = {
 };
 
 const PERIODS: Period[] = [
-  { id: 'morning', label: '아침', time: '08:00', hour: 8, minute: 0 },
-  { id: 'lunch', label: '점심', time: '12:00', hour: 12, minute: 0 },
-  { id: 'evening', label: '저녁', time: '20:00', hour: 20, minute: 0 },
+  { id: 'morning', label: '아침', emoji: '🌅', time: '08:00', hour: 8, minute: 0 },
+  { id: 'lunch', label: '점심', emoji: '☀️', time: '12:00', hour: 12, minute: 0 },
+  { id: 'evening', label: '저녁', emoji: '🌙', time: '20:00', hour: 20, minute: 0 },
 ];
 
-const MOODS = ['좋음', '보통', '불안', '우울', '짜증', '피곤', '평온'];
+const MOODS: { label: string; emoji: string; color: string }[] = [
+  { label: '좋음',  emoji: '😊', color: '#52796f' },
+  { label: '보통',  emoji: '😐', color: '#7a8fa6' },
+  { label: '불안',  emoji: '😰', color: '#9b7fa6' },
+  { label: '우울',  emoji: '😢', color: '#516b8c' },
+  { label: '짜증',  emoji: '😠', color: '#b85c5c' },
+  { label: '피곤',  emoji: '😴', color: '#8a7660' },
+  { label: '평온',  emoji: '😌', color: '#4a8c6f' },
+];
+
+const MOOD_MAP = Object.fromEntries(MOODS.map((m) => [m.label, m]));
+const MOOD_LABELS = MOODS.map((m) => m.label);
+
 const RECORDS_KEY = 'mood-checkin.records';
 const NOTIFIED_KEY = 'mood-checkin.notified';
 const NOTICE_TEXT = '지금 기분을 기록할 시간입니다.';
@@ -84,6 +97,16 @@ const getNextNotificationTarget = () => {
   target.setDate(target.getDate() + 1);
   target.setHours(PERIODS[0].hour, PERIODS[0].minute, 0, 0);
   return { target, period: PERIODS[0] };
+};
+
+const exportRecordsAsJSON = (records: MoodRecord[]) => {
+  const blob = new Blob([JSON.stringify(records, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `mood-records-${formatDate(new Date())}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
 };
 
 function App() {
@@ -156,9 +179,9 @@ function App() {
 
   const moodCounts = useMemo(
     () =>
-      MOODS.map((mood) => ({
-        mood,
-        count: records.filter((record) => record.mood === mood).length,
+      MOODS.map((m) => ({
+        ...m,
+        count: records.filter((record) => record.mood === m.label).length,
       })),
     [records],
   );
@@ -172,12 +195,14 @@ function App() {
       const completed = PERIODS.filter((period) =>
         dayRecords.some((record) => record.period === period.id),
       ).length;
-      const moods = dayRecords.map((record) => record.mood).join(', ');
+      const moodEmojis = dayRecords
+        .map((record) => MOOD_MAP[record.mood]?.emoji ?? record.mood)
+        .join(' ');
 
       return {
         date: dateText,
         completed,
-        moods: moods || '기록 없음',
+        moods: moodEmojis || '기록 없음',
       };
     });
   }, [records]);
@@ -244,14 +269,25 @@ function App() {
           <h1>감정 기록</h1>
           <p className="today">{today}</p>
         </div>
-        <button
-          className="notification-button"
-          type="button"
-          onClick={requestNotificationPermission}
-          disabled={notificationStatus === 'granted' || notificationStatus === 'unsupported'}
-        >
-          {notificationLabel}
-        </button>
+        <div className="top-actions">
+          <button
+            className="export-button"
+            type="button"
+            onClick={() => exportRecordsAsJSON(records)}
+            disabled={records.length === 0}
+            title="기록을 JSON 파일로 내보냅니다"
+          >
+            📥 내보내기
+          </button>
+          <button
+            className="notification-button"
+            type="button"
+            onClick={requestNotificationPermission}
+            disabled={notificationStatus === 'granted' || notificationStatus === 'unsupported'}
+          >
+            {notificationLabel}
+          </button>
+        </div>
       </section>
 
       <section className="grid-layout">
@@ -262,7 +298,7 @@ function App() {
               <h2>{completionCount}/3 완료</h2>
             </div>
             <span className="completion-chip">
-              {completionCount === 3 ? '완료' : `${3 - completionCount}개 남음`}
+              {completionCount === 3 ? '✅ 완료' : `${3 - completionCount}개 남음`}
             </span>
           </div>
 
@@ -278,9 +314,14 @@ function App() {
                   type="button"
                   onClick={() => setSelectedPeriod(period.id)}
                 >
+                  <span className="period-emoji">{period.emoji}</span>
                   <span>{period.label}</span>
                   <strong>{period.time}</strong>
-                  <small>{record ? `${record.mood} 기록됨` : '대기'}</small>
+                  <small>
+                    {record
+                      ? `${MOOD_MAP[record.mood]?.emoji ?? ''} ${record.mood} 기록됨`
+                      : '대기'}
+                  </small>
                 </button>
               );
             })}
@@ -288,21 +329,28 @@ function App() {
 
           <div className="entry-box">
             <div className="entry-heading">
-              <h3>{selectedPeriodInfo.label} 기록</h3>
+              <h3>
+                {selectedPeriodInfo.emoji} {selectedPeriodInfo.label} 기록
+              </h3>
               <span>{selectedPeriodInfo.time}</span>
             </div>
 
             <div className="mood-grid" aria-label="기분 선택 영역">
-              {MOODS.map((mood) => (
-                <button
-                  key={mood}
-                  className={`mood-button ${selectedMood === mood ? 'selected' : ''}`}
-                  type="button"
-                  onClick={() => setSelectedMood(mood)}
-                >
-                  {mood}
-                </button>
-              ))}
+              {MOOD_LABELS.map((label) => {
+                const m = MOOD_MAP[label];
+                return (
+                  <button
+                    key={label}
+                    className={`mood-button ${selectedMood === label ? 'selected' : ''}`}
+                    style={selectedMood === label ? { background: m.color, borderColor: m.color } : {}}
+                    type="button"
+                    onClick={() => setSelectedMood(label)}
+                  >
+                    <span className="mood-emoji">{m.emoji}</span>
+                    {label}
+                  </button>
+                );
+              })}
             </div>
 
             <label className="memo-label" htmlFor="memo">
@@ -347,12 +395,17 @@ function App() {
             <p className="section-label">기분별 횟수</p>
             <div className="stats-list">
               {moodCounts.map((item) => (
-                <div className="stat-row" key={item.mood}>
-                  <span>{item.mood}</span>
+                <div className="stat-row" key={item.label}>
+                  <span>
+                    {item.emoji} {item.label}
+                  </span>
                   <div className="stat-track">
                     <div
                       className="stat-bar"
-                      style={{ width: `${(item.count / maxMoodCount) * 100}%` }}
+                      style={{
+                        width: `${(item.count / maxMoodCount) * 100}%`,
+                        background: item.color,
+                      }}
                     />
                   </div>
                   <strong>{item.count}</strong>
@@ -389,23 +442,32 @@ function App() {
           {filteredRecords.length === 0 ? (
             <p className="empty-state">아직 저장된 기록이 없습니다.</p>
           ) : (
-            filteredRecords.map((record) => (
-              <article className="record-item" key={record.id}>
-                <div className="record-main">
-                  <div className="record-meta">
-                    <strong>{record.date}</strong>
-                    <span>
-                      {getPeriod(record.period).label} · {record.inputTime}
-                    </span>
+            filteredRecords.map((record) => {
+              const moodInfo = MOOD_MAP[record.mood];
+              const periodInfo = getPeriod(record.period);
+              return (
+                <article className="record-item" key={record.id}>
+                  <div className="record-main">
+                    <div className="record-meta">
+                      <strong>{record.date}</strong>
+                      <span>
+                        {periodInfo.emoji} {periodInfo.label} · {record.inputTime}
+                      </span>
+                    </div>
+                    <div
+                      className="record-mood"
+                      style={moodInfo ? { background: moodInfo.color + '22', color: moodInfo.color } : {}}
+                    >
+                      {moodInfo?.emoji} {record.mood}
+                    </div>
+                    {record.memo && <p>{record.memo}</p>}
                   </div>
-                  <div className="record-mood">{record.mood}</div>
-                  {record.memo && <p>{record.memo}</p>}
-                </div>
-                <button type="button" onClick={() => deleteRecord(record.id)}>
-                  삭제
-                </button>
-              </article>
-            ))
+                  <button type="button" onClick={() => deleteRecord(record.id)}>
+                    삭제
+                  </button>
+                </article>
+              );
+            })
           )}
         </div>
       </section>
