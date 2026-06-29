@@ -1,16 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import { readConfig, writeConfig, AppConfig, MoodConfig, PeriodConfig } from './config';
 
-type PeriodId = 'morning' | 'lunch' | 'evening';
+type PeriodId = string;
 type NotificationStatus = 'unsupported' | 'default' | 'granted' | 'denied';
-
-type Period = {
-  id: PeriodId;
-  label: string;
-  emoji: string;
-  time: string;
-  hour: number;
-  minute: number;
-};
 
 type MoodRecord = {
   id: string;
@@ -21,28 +13,8 @@ type MoodRecord = {
   memo: string;
 };
 
-const PERIODS: Period[] = [
-  { id: 'morning', label: '아침', emoji: '🌅', time: '08:00', hour: 8, minute: 0 },
-  { id: 'lunch', label: '점심', emoji: '☀️', time: '12:00', hour: 12, minute: 0 },
-  { id: 'evening', label: '저녁', emoji: '🌙', time: '20:00', hour: 20, minute: 0 },
-];
-
-const MOODS: { label: string; emoji: string; color: string }[] = [
-  { label: '좋음',  emoji: '😊', color: '#52796f' },
-  { label: '보통',  emoji: '😐', color: '#7a8fa6' },
-  { label: '불안',  emoji: '😰', color: '#9b7fa6' },
-  { label: '우울',  emoji: '😢', color: '#516b8c' },
-  { label: '짜증',  emoji: '😠', color: '#b85c5c' },
-  { label: '피곤',  emoji: '😴', color: '#8a7660' },
-  { label: '평온',  emoji: '😌', color: '#4a8c6f' },
-];
-
-const MOOD_MAP = Object.fromEntries(MOODS.map((m) => [m.label, m]));
-const MOOD_LABELS = MOODS.map((m) => m.label);
-
 const RECORDS_KEY = 'mood-checkin.records';
 const NOTIFIED_KEY = 'mood-checkin.notified';
-const NOTICE_TEXT = '지금 기분을 기록할 시간입니다.';
 
 const formatDate = (date: Date) => {
   const year = date.getFullYear();
@@ -58,8 +30,6 @@ const formatInputTime = (date: Date) =>
     second: '2-digit',
     hour12: false,
   }).format(date);
-
-const getPeriod = (id: PeriodId) => PERIODS.find((period) => period.id === id)!;
 
 const readRecords = (): MoodRecord[] => {
   try {
@@ -81,13 +51,12 @@ const readNotifiedKeys = (): string[] => {
 
 const buildNotificationKey = (date: string, period: PeriodId) => `${date}:${period}`;
 
-const getNextNotificationTarget = () => {
+const getNextNotificationTarget = (periods: PeriodConfig[]) => {
   const now = new Date();
 
-  for (const period of PERIODS) {
+  for (const period of periods) {
     const target = new Date(now);
     target.setHours(period.hour, period.minute, 0, 0);
-
     if (target.getTime() > now.getTime()) {
       return { target, period };
     }
@@ -95,8 +64,8 @@ const getNextNotificationTarget = () => {
 
   const target = new Date(now);
   target.setDate(target.getDate() + 1);
-  target.setHours(PERIODS[0].hour, PERIODS[0].minute, 0, 0);
-  return { target, period: PERIODS[0] };
+  target.setHours(periods[0].hour, periods[0].minute, 0, 0);
+  return { target, period: periods[0] };
 };
 
 const exportRecordsAsJSON = (records: MoodRecord[]) => {
@@ -110,9 +79,26 @@ const exportRecordsAsJSON = (records: MoodRecord[]) => {
 };
 
 function App() {
+  const [appConfig, setAppConfig] = useState<AppConfig>(() => readConfig());
+  const { moods, periods, noticeText } = appConfig;
+
+  const moodMap = useMemo(
+    () => Object.fromEntries(moods.map((m) => [m.label, m])),
+    [moods],
+  );
+  const getMood = (label: string): MoodConfig | undefined => moodMap[label];
+  const getPeriod = (id: PeriodId): PeriodConfig | undefined =>
+    periods.find((p) => p.id === id);
+
+  useEffect(() => {
+    const onStorage = () => setAppConfig(readConfig());
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
   const today = formatDate(new Date());
   const [records, setRecords] = useState<MoodRecord[]>(() => readRecords());
-  const [selectedPeriod, setSelectedPeriod] = useState<PeriodId>('morning');
+  const [selectedPeriod, setSelectedPeriod] = useState<PeriodId>(periods[0]?.id ?? 'morning');
   const [selectedMood, setSelectedMood] = useState('');
   const [memo, setMemo] = useState('');
   const [filterDate, setFilterDate] = useState('');
@@ -129,7 +115,6 @@ function App() {
     const existing = records.find(
       (record) => record.date === today && record.period === selectedPeriod,
     );
-
     setSelectedMood(existing?.mood ?? '');
     setMemo(existing?.memo ?? '');
   }, [records, selectedPeriod, today]);
@@ -140,7 +125,7 @@ function App() {
     let timeoutId: number;
 
     const schedule = () => {
-      const { target, period } = getNextNotificationTarget();
+      const { target, period } = getNextNotificationTarget(periods);
       const delay = Math.max(target.getTime() - Date.now(), 1000);
 
       timeoutId = window.setTimeout(() => {
@@ -149,7 +134,7 @@ function App() {
         const notifiedKeys = readNotifiedKeys();
 
         if (!notifiedKeys.includes(key)) {
-          new Notification(NOTICE_TEXT);
+          new Notification(noticeText);
           localStorage.setItem(NOTIFIED_KEY, JSON.stringify([...notifiedKeys, key].slice(-30)));
         }
 
@@ -159,7 +144,7 @@ function App() {
 
     schedule();
     return () => window.clearTimeout(timeoutId);
-  }, [notificationStatus]);
+  }, [notificationStatus, periods, noticeText]);
 
   const todayRecords = useMemo(
     () => records.filter((record) => record.date === today),
@@ -170,20 +155,21 @@ function App() {
     const sorted = [...records].sort((a, b) => {
       const dateCompare = b.date.localeCompare(a.date);
       if (dateCompare !== 0) return dateCompare;
-      return PERIODS.findIndex((period) => period.id === a.period) -
-        PERIODS.findIndex((period) => period.id === b.period);
+      return (
+        periods.findIndex((p) => p.id === a.period) -
+        periods.findIndex((p) => p.id === b.period)
+      );
     });
-
-    return filterDate ? sorted.filter((record) => record.date === filterDate) : sorted;
-  }, [filterDate, records]);
+    return filterDate ? sorted.filter((r) => r.date === filterDate) : sorted;
+  }, [filterDate, records, periods]);
 
   const moodCounts = useMemo(
     () =>
-      MOODS.map((m) => ({
+      moods.map((m) => ({
         ...m,
-        count: records.filter((record) => record.mood === m.label).length,
+        count: records.filter((r) => r.mood === m.label).length,
       })),
-    [records],
+    [records, moods],
   );
 
   const recentSummary = useMemo(() => {
@@ -191,21 +177,16 @@ function App() {
       const date = new Date();
       date.setDate(date.getDate() - index);
       const dateText = formatDate(date);
-      const dayRecords = records.filter((record) => record.date === dateText);
-      const completed = PERIODS.filter((period) =>
-        dayRecords.some((record) => record.period === period.id),
+      const dayRecords = records.filter((r) => r.date === dateText);
+      const completed = periods.filter((p) =>
+        dayRecords.some((r) => r.period === p.id),
       ).length;
       const moodEmojis = dayRecords
-        .map((record) => MOOD_MAP[record.mood]?.emoji ?? record.mood)
+        .map((r) => getMood(r.mood)?.emoji ?? r.mood)
         .join(' ');
-
-      return {
-        date: dateText,
-        completed,
-        moods: moodEmojis || '기록 없음',
-      };
+      return { date: dateText, completed, moods: moodEmojis || '기록 없음' };
     });
-  }, [records]);
+  }, [records, periods, moodMap]);
 
   const completionCount = todayRecords.length;
   const selectedPeriodInfo = getPeriod(selectedPeriod);
@@ -216,19 +197,16 @@ function App() {
       setNotificationStatus('unsupported');
       return;
     }
-
     const permission = await Notification.requestPermission();
     setNotificationStatus(permission);
   };
 
   const saveRecord = () => {
     if (!selectedMood) return;
-
     const now = new Date();
     const existing = records.find(
-      (record) => record.date === today && record.period === selectedPeriod,
+      (r) => r.date === today && r.period === selectedPeriod,
     );
-
     const nextRecord: MoodRecord = {
       id: existing?.id ?? `${today}-${selectedPeriod}-${now.getTime()}`,
       date: today,
@@ -237,22 +215,18 @@ function App() {
       mood: selectedMood,
       memo: memo.trim(),
     };
-
     setRecords((current) => {
-      if (existing) {
-        return current.map((record) => (record.id === existing.id ? nextRecord : record));
-      }
-
+      if (existing) return current.map((r) => (r.id === existing.id ? nextRecord : r));
       return [nextRecord, ...current];
     });
   };
 
   const deleteRecord = (id: string) => {
-    setRecords((current) => current.filter((record) => record.id !== id));
+    setRecords((current) => current.filter((r) => r.id !== id));
   };
 
   const getRecordForPeriod = (periodId: PeriodId) =>
-    todayRecords.find((record) => record.period === periodId);
+    todayRecords.find((r) => r.period === periodId);
 
   const notificationLabel = {
     unsupported: '알림 미지원',
@@ -270,6 +244,9 @@ function App() {
           <p className="today">{today}</p>
         </div>
         <div className="top-actions">
+          <a className="admin-link-btn" href="#admin" title="앱 설정 관리자">
+            ⚙️ 관리
+          </a>
           <button
             className="export-button"
             type="button"
@@ -295,17 +272,20 @@ function App() {
           <div className="panel-title-row">
             <div>
               <p className="section-label">오늘의 입력 카드</p>
-              <h2>{completionCount}/3 완료</h2>
+              <h2>{completionCount}/{periods.length} 완료</h2>
             </div>
             <span className="completion-chip">
-              {completionCount === 3 ? '✅ 완료' : `${3 - completionCount}개 남음`}
+              {completionCount === periods.length
+                ? '✅ 완료'
+                : `${periods.length - completionCount}개 남음`}
             </span>
           </div>
 
-          <div className="period-grid" aria-label="아침 점심 저녁 기록 버튼">
-            {PERIODS.map((period) => {
+          <div className="period-grid" aria-label="시간대 기록 버튼">
+            {periods.map((period) => {
               const record = getRecordForPeriod(period.id);
               const isSelected = selectedPeriod === period.id;
+              const recordMood = record ? getMood(record.mood) : undefined;
 
               return (
                 <button
@@ -319,7 +299,7 @@ function App() {
                   <strong>{period.time}</strong>
                   <small>
                     {record
-                      ? `${MOOD_MAP[record.mood]?.emoji ?? ''} ${record.mood} 기록됨`
+                      ? `${recordMood?.emoji ?? ''} ${record.mood} 기록됨`
                       : '대기'}
                   </small>
                 </button>
@@ -330,27 +310,28 @@ function App() {
           <div className="entry-box">
             <div className="entry-heading">
               <h3>
-                {selectedPeriodInfo.emoji} {selectedPeriodInfo.label} 기록
+                {selectedPeriodInfo?.emoji} {selectedPeriodInfo?.label ?? ''} 기록
               </h3>
-              <span>{selectedPeriodInfo.time}</span>
+              <span>{selectedPeriodInfo?.time}</span>
             </div>
 
             <div className="mood-grid" aria-label="기분 선택 영역">
-              {MOOD_LABELS.map((label) => {
-                const m = MOOD_MAP[label];
-                return (
-                  <button
-                    key={label}
-                    className={`mood-button ${selectedMood === label ? 'selected' : ''}`}
-                    style={selectedMood === label ? { background: m.color, borderColor: m.color } : {}}
-                    type="button"
-                    onClick={() => setSelectedMood(label)}
-                  >
-                    <span className="mood-emoji">{m.emoji}</span>
-                    {label}
-                  </button>
-                );
-              })}
+              {moods.map((m) => (
+                <button
+                  key={m.label}
+                  className={`mood-button ${selectedMood === m.label ? 'selected' : ''}`}
+                  style={
+                    selectedMood === m.label
+                      ? { background: m.color, borderColor: m.color }
+                      : {}
+                  }
+                  type="button"
+                  onClick={() => setSelectedMood(m.label)}
+                >
+                  <span className="mood-emoji">{m.emoji}</span>
+                  {m.label}
+                </button>
+              ))}
             </div>
 
             <label className="memo-label" htmlFor="memo">
@@ -359,7 +340,7 @@ function App() {
             <textarea
               id="memo"
               value={memo}
-              onChange={(event) => setMemo(event.target.value)}
+              onChange={(e) => setMemo(e.target.value)}
               placeholder="지금 마음에 남은 말을 적어보세요."
               rows={5}
             />
@@ -385,7 +366,9 @@ function App() {
                     <strong>{item.date}</strong>
                     <span>{item.moods}</span>
                   </div>
-                  <em>{item.completed}/3</em>
+                  <em>
+                    {item.completed}/{periods.length}
+                  </em>
                 </div>
               ))}
             </div>
@@ -428,7 +411,7 @@ function App() {
               id="date-filter"
               type="date"
               value={filterDate}
-              onChange={(event) => setFilterDate(event.target.value)}
+              onChange={(e) => setFilterDate(e.target.value)}
             />
             {filterDate && (
               <button type="button" onClick={() => setFilterDate('')}>
@@ -443,7 +426,7 @@ function App() {
             <p className="empty-state">아직 저장된 기록이 없습니다.</p>
           ) : (
             filteredRecords.map((record) => {
-              const moodInfo = MOOD_MAP[record.mood];
+              const moodInfo = getMood(record.mood);
               const periodInfo = getPeriod(record.period);
               return (
                 <article className="record-item" key={record.id}>
@@ -451,12 +434,17 @@ function App() {
                     <div className="record-meta">
                       <strong>{record.date}</strong>
                       <span>
-                        {periodInfo.emoji} {periodInfo.label} · {record.inputTime}
+                        {periodInfo?.emoji ?? ''} {periodInfo?.label ?? record.period} ·{' '}
+                        {record.inputTime}
                       </span>
                     </div>
                     <div
                       className="record-mood"
-                      style={moodInfo ? { background: moodInfo.color + '22', color: moodInfo.color } : {}}
+                      style={
+                        moodInfo
+                          ? { background: moodInfo.color + '22', color: moodInfo.color }
+                          : {}
+                      }
                     >
                       {moodInfo?.emoji} {record.mood}
                     </div>

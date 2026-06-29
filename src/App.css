@@ -474,6 +474,256 @@ textarea {
   text-align: center;
 }
 
+/* ── 관리자 링크 버튼 ── */
+.admin-link-btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  min-width: 80px;
+  padding: 0 14px;
+  border-radius: 8px;
+  background: var(--paper-strong);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-weight: 800;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.admin-back-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  font-size: 0.95rem;
+}
+
+/* ── 관리자 탭 ── */
+.admin-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.admin-tabs button {
+  min-height: 42px;
+  padding: 0 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--muted);
+  font-weight: 800;
+  font-size: 0.95rem;
+  transition: background 0.15s, color 0.15s;
+}
+
+.admin-tabs button.active {
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+  color: #fff;
+}
+
+/* ── 관리자 패널 ── */
+.admin-panel {
+  padding: 24px;
+  display: grid;
+  gap: 16px;
+}
+
+.admin-panel .section-label {
+  margin: 0;
+}
+
+/* ── 감정 목록 ── */
+.mood-admin-list {
+  display: grid;
+  gap: 8px;
+}
+
+.mood-admin-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.mood-order-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mood-order-btns button {
+  width: 28px;
+  height: 22px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper-strong);
+  color: var(--muted);
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+.mood-order-btns button:disabled {
+  opacity: 0.3;
+}
+
+.mood-preview-chip {
+  flex: 1;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-weight: 900;
+  font-size: 1rem;
+}
+
+.row-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.row-actions button {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper-strong);
+  color: var(--ink);
+  font-weight: 800;
+  font-size: 0.88rem;
+}
+
+.delete-btn {
+  border-color: #ead0cd !important;
+  background: #fff4f2 !important;
+  color: var(--rose) !important;
+}
+
+/* ── 감정 추가 폼 ── */
+.mood-add-form {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.form-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.form-row input {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+}
+
+.emoji-input {
+  width: 64px;
+  text-align: center;
+  font-size: 1.3rem;
+}
+
+.color-input {
+  width: 52px;
+  height: 44px;
+  padding: 4px;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.form-row input:not(.emoji-input):not(.color-input) {
+  flex: 1;
+  min-width: 120px;
+}
+
+.mood-admin-row.editing {
+  flex-wrap: wrap;
+  padding: 14px;
+}
+
+/* ── 시간대 편집 ── */
+.period-edit-list {
+  display: grid;
+  gap: 12px;
+}
+
+.period-edit-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.period-id-label {
+  width: 70px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.period-edit-row input[type='time'] {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  width: 130px;
+}
+
+.period-edit-row input:not(.emoji-input):not([type='time']) {
+  flex: 1;
+  min-width: 80px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+}
+
+.admin-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* ── 저장 토스트 ── */
+.save-toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 28px;
+  border-radius: 999px;
+  background: var(--green-dark);
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.95rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  z-index: 100;
+  animation: toastIn 0.2s ease-out;
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ── 반응형 ── */
 @media (max-width: 860px) {
   .app-shell {
     width: min(100% - 24px, 680px);
@@ -497,6 +747,13 @@ textarea {
 
   .mood-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-link-btn,
+  .export-button,
+  .admin-back-btn {
+    width: 100%;
+    justify-content: center;
   }
 }
 
@@ -524,5 +781,46 @@ textarea {
 
   .record-item button {
     width: 100%;
+  }
+
+  .form-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .emoji-input,
+  .color-input {
+    width: 100%;
+  }
+}
+
+/* ── 다크모드 관리자 ── */
+@media (prefers-color-scheme: dark) {
+  .mood-admin-row,
+  .period-edit-row,
+  .form-row input,
+  .period-edit-row input {
+    background: #2d2920;
+  }
+
+  .admin-link-btn {
+    background: #2d2920;
+  }
+
+  .admin-tabs button {
+    background: #252219;
+    border-color: #3a352c;
+    color: #9a9590;
+  }
+
+  .row-actions button {
+    background: #2d2920;
+    border-color: #3a352c;
+    color: #e8e3da;
+  }
+
+  .mood-order-btns button {
+    background: #3a352c;
+    border-color: #4a4540;
   }
 }
