@@ -55,5 +55,5 @@ npm.cmd run build
 ## 알림 안내
 
 브라우저 알림은 사용자가 앱에서 알림 권한을 허용해야 동작합니다. 외부 서버나 백그라운드 서비스 없이 구현되어 있어 앱이 브라우저에서 열려 있을 때 정해진 시간에 알림을 보냅니다.
+https://totoro00joon-svg.github.io/mood--tracker-korean/
 
-https://github.com/totoro00joon-svg/mood--tracker-korean
